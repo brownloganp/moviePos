@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ticket Taker">
+<meta name="theme-color" content="#0f141c">
+<title>Ticket Taker</title>
+<style>
+  :root {
+    --bg: #0f141c; --panel: #19212e; --btn: #2a3550; --accent: #2563eb; --good: #15803d;
+    --warn: #b45309; --bad: #b91c1c; --text: #f1f5f9; --subtle: #94a3b8; --gold: #fbbf24;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); overscroll-behavior: none; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation;
+  }
+  main {
+    max-width: 520px; margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 24px);
+  }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 4px 2px 10px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--subtle); }
+  .dot.ok { background: #4ade80; } .dot.down { background: #f87171; }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: .8px; color: var(--subtle); margin: 4px 2px; }
+  .idbox {
+    background: var(--panel); border-radius: 12px; padding: 10px 16px; font-size: 34px; font-weight: 700;
+    text-align: right; min-height: 60px; font-variant-numeric: tabular-nums; overflow: hidden;
+  }
+  #sink { position: fixed; left: -100px; top: 0; width: 1px; height: 1px; opacity: 0; font-size: 16px; border: 0; padding: 0; }
+
+  #panel { background: var(--panel); border-radius: 14px; margin: 12px 0; overflow: hidden; }
+  .banner { padding: 20px 12px; text-align: center; font-size: 25px; font-weight: 800; line-height: 1.15; }
+  .banner.idle { color: var(--subtle); } .banner.good { background: var(--good); }
+  .banner.warn { background: var(--warn); } .banner.bad { background: var(--bad); }
+  #details { padding: 14px 16px; font-size: 18px; line-height: 1.4; white-space: pre-line; word-break: break-word; }
+  #details .movie { font-weight: 700; font-size: 20px; }
+  #warning { padding: 0 16px; color: var(--gold); font-size: 16px; white-space: pre-line; }
+  #warning:not(:empty) { padding-bottom: 10px; }
+  #controls { padding: 6px 14px 16px; }
+  .stepper { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .stepper span.cap { color: var(--subtle); font-size: 17px; }
+  .stepper .ctl { display: flex; align-items: center; gap: 6px; }
+  .stepper .num { font-size: 30px; font-weight: 800; min-width: 44px; text-align: center; }
+  button {
+    font: inherit; color: var(--text); background: var(--btn); border: 0; border-radius: 12px;
+    font-weight: 700; cursor: pointer;
+  }
+  button:active:not(:disabled) { filter: brightness(1.35); }
+  button:disabled { background: #202734; color: #5b6577; }
+  .step { width: 56px; height: 48px; font-size: 26px; }
+  .step.plus { background: var(--accent); }
+  .big { display: block; width: 100%; padding: 18px; font-size: 21px; }
+  .big.go { background: var(--good); }
+  .small { display: block; width: 100%; padding: 12px; font-size: 16px; margin-top: 10px; }
+  #pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  #pad button { height: 58px; font-size: 26px; }
+  #lookup { background: var(--accent); margin-top: 10px; }
+  [hidden] { display: none !important; }
+
+  .tabs { display: flex; gap: 8px; margin: 0 0 12px; }
+  .tabs button { flex: 1; padding: 12px; font-size: 17px; }
+  .tabs button.on { background: var(--accent); }
+  .daynav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .daynav button { width: 56px; height: 48px; font-size: 22px; }
+  #day { flex: 1; text-align: center; font-size: 20px; font-weight: 800; }
+  #total { background: var(--panel); border-radius: 14px; padding: 16px; text-align: center; font-size: 28px; font-weight: 800; }
+  #total small { display: block; margin-top: 2px; color: var(--subtle); font-size: 14px; font-weight: 600; }
+  #shows { margin: 10px 0; }
+  .show { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--panel); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .show .t { font-size: 17px; font-weight: 700; word-break: break-word; }
+  .show .sub { color: var(--subtle); font-size: 14px; margin-top: 2px; }
+  .show .n { font-size: 24px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .show .n.done { color: #4ade80; }
+  #counts-msg { padding: 24px 8px; text-align: center; color: var(--subtle); font-size: 17px; }
+
+  #modal { position: fixed; inset: 0; background: rgba(0, 0, 0, .65); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 10; }
+  #modal .box { background: var(--panel); border-radius: 16px; padding: 22px; width: 100%; max-width: 400px; }
+  #modal p { margin: 0 0 18px; font-size: 19px; line-height: 1.35; white-space: pre-line; }
+  #modal .row { display: flex; gap: 10px; }
+  #modal .row button { flex: 1; padding: 15px; font-size: 18px; }
+  #modal .ok.danger { background: var(--bad); } #modal .ok { background: var(--good); }
+</style>
+</head>
+<body>
+<noscript><p style="padding:20px">This page needs JavaScript.</p></noscript>
+<main>
+  <header><h1>Ticket Taker</h1><span id="conn" class="dot" title="Connection to the POS"></span></header>
+
+  <nav class="tabs">
+    <button type="button" id="tab-scan" class="on">Scan</button>
+    <button type="button" id="tab-counts">Check-in counts</button>
+  </nav>
+
+  <div id="scan-view">
+  <div class="label">SCAN TICKET OR ENTER ID</div>
+  <div id="idbox" class="idbox">&nbsp;</div>
+  <input id="sink" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Barcode scanner input">
+
+  <section id="panel">
+    <div id="banner" class="banner idle">READY TO SCAN</div>
+    <div id="details"></div>
+    <div id="warning"></div>
+    <div id="controls" hidden>
+      <div class="stepper" id="stepper">
+        <span class="cap">People checking in now</span>
+        <span class="ctl">
+          <button type="button" class="step" id="minus" aria-label="Fewer">&minus;</button>
+          <span class="num" id="admit">0</span>
+          <button type="button" class="step plus" id="plus" aria-label="More">+</button>
+        </span>
+      </div>
+      <button type="button" class="big go" id="go">Check in</button>
+      <button type="button" class="small" id="undo">Undo check-ins</button>
+    </div>
+  </section>
+
+  <section id="pad"></section>
+  <button type="button" class="big" id="lookup">Look up</button>
+  </div>
+
+  <div id="counts-view" hidden>
+    <div class="daynav">
+      <button type="button" id="day-prev" aria-label="Previous day">&#9664;</button>
+      <div id="day">&nbsp;</div>
+      <button type="button" id="day-next" aria-label="Next day">&#9654;</button>
+    </div>
+    <div id="total"></div>
+    <div id="shows"></div>
+    <div id="counts-msg" hidden></div>
+    <button type="button" class="small" id="day-today" hidden>Back to today</button>
+    <button type="button" class="small" id="counts-refresh">Refresh</button>
+  </div>
+</main>
+
+<div id="modal" hidden>
+  <div class="box">
+    <p id="modal-text"></p>
+    <div class="row"><button type="button" id="modal-cancel">Cancel</button><button type="button" class="ok" id="modal-ok">OK</button></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---- access key: arrives once in the QR link, then lives in this browser ----
+  var KEY_NAME = 'moviepos_key';
+  var key = null;
+  try {
+    var fromUrl = new URLSearchParams(location.search).get('key');
+    if (fromUrl) {
+      localStorage.setItem(KEY_NAME, fromUrl);
+      history.replaceState(null, '', location.pathname);
+    }
+    key = localStorage.getItem(KEY_NAME);
+  } catch (e) { /* private mode: fall through */ }
+
+  function $(id) { return document.getElementById(id); }
+  var el = {
+    idbox: $('idbox'), banner: $('banner'), details: $('details'), warning: $('warning'),
+    controls: $('controls'), stepper: $('stepper'), admit: $('admit'), go: $('go'), undo: $('undo'),
+    conn: $('conn'), sink: $('sink'), modal: $('modal'), modalText: $('modal-text'),
+    modalOk: $('modal-ok'), modalCancel: $('modal-cancel')
+  };
+
+  var tab = 'scan';
+  var counts = null;     // last /api/checkins result
+  var countsDay = null;  // ISO date being viewed; null = today (the POS decides)
+  var countsSeq = 0;
+  var MAX_DIGITS = 12;
+  var digits = '';
+  var sale = null;       // last ticket shown
+  var notice = '';       // message shown instead of a ticket
+  var justAdmitted = 0;
+  var admit = 0;
+  var seq = 0;           // ignore out-of-order lookups when scans arrive quickly
+  var modalOpen = false;
+
+  function pad6(n) { return String(n).padStart(6, '0'); }
+
+  // ---- server calls ----
+  function api(method, path, body) {
+    var opts = { method: method, headers: { 'X-Access-Key': key || '' }, cache: 'no-store' };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    return fetch(path, opts).then(function (r) {
+      setConn(true);
+      return r.json().catch(function () { return {}; }).then(function (j) { return { status: r.status, json: j }; });
+    }, function () { setConn(false); return { status: 0, json: {} }; });
+  }
+  function setConn(ok) { el.conn.className = 'dot ' + (ok ? 'ok' : 'down'); }
+  function failText(res) {
+    if (res.status === 0) return "Can't reach the POS. Check Wi-Fi.";
+    if (res.status === 401) return 'Access key rejected. Scan the QR code on the POS again.';
+    return (res.json && res.json.error) || 'Something went wrong.';
+  }
+
+  // ---- input ----
+  function renderId() { el.idbox.textContent = digits || ' '; }
+  function pushDigit(d) { if (digits.length < MAX_DIGITS) { digits += d; renderId(); } }
+  function backspace() { digits = digits.slice(0, -1); renderId(); }
+
+  function lookup() {
+    if (!digits) return;
+    var n = parseInt(digits, 10);
+    digits = '';
+    renderId();
+    justAdmitted = 0;
+    var mine = ++seq;
+    api('GET', '/api/ticket?id=' + n).then(function (res) {
+      if (mine !== seq) return;
+      if (res.status === 200) {
+        sale = res.json.ticket; notice = ''; admit = Math.max(sale.notCheckedIn, 1);
+      } else {
+        sale = null;
+        notice = res.status === 404 ? 'No ticket with ID ' + pad6(n) : failText(res);
+      }
+      render();
+    });
+  }
+
+  function ask(text, okText, danger) {
+    return new Promise(function (resolve) {
+      modalOpen = true;
+      el.modalText.textContent = text;
+      el.modalOk.textContent = okText;
+      el.modalOk.className = 'ok' + (danger ? ' danger' : '');
+      el.modal.hidden = false;
+      function done(v) {
+        modalOpen = false; el.modal.hidden = true;
+        el.modalOk.onclick = el.modalCancel.onclick = null;
+        resolve(v);
+      }
+      el.modalOk.onclick = function () { done(true); };
+      el.modalCancel.onclick = function () { done(false); };
+    });
+  }
+
+  function refreshSale(id) {
+    return api('GET', '/api/ticket?id=' + id).then(function (res) { if (res.status === 200) sale = res.json.ticket; });
+  }
+
+  async function checkIn() {
+    var s = sale;
+    if (!s || s.status !== 'sold' || s.notCheckedIn === 0) return;
+    if (!s.isToday) {
+      var ok = await ask('This ticket is for ' + s.day + ', not today.\nCheck in anyway?', 'Check in', false);
+      if (!ok) return;
+    }
+    var res = await api('POST', '/api/checkin', { id: s.id, count: admit });
+    if (res.status === 200) {
+      sale = res.json.ticket; justAdmitted = admit; admit = Math.max(sale.notCheckedIn, 1);
+    } else {
+      await ask(failText(res), 'OK', false);
+      await refreshSale(s.id);
+    }
+    render();
+  }
+
+  async function undo() {
+    var s = sale;
+    if (!s || s.status !== 'sold' || s.checkedIn === 0) return;
+    var ok = await ask('Reset check-in for ticket ' + s.idText + '?\n' + s.checkedIn + ' checked in will be cleared.', 'Undo', true);
+    if (!ok) return;
+    var res = await api('POST', '/api/undo', { id: s.id });
+    if (res.status === 200) {
+      sale = res.json.ticket; justAdmitted = 0; admit = sale.notCheckedIn;
+    } else {
+      await ask(failText(res), 'OK', false);
+      await refreshSale(s.id);
+    }
+    render();
+  }
+
+  // ---- display (mirrors the desktop Ticket Taker screen) ----
+  function setBanner(text, kind) { el.banner.textContent = text; el.banner.className = 'banner ' + kind; }
+  function setDetails(lines) {
+    el.details.textContent = '';
+    lines.forEach(function (line) {
+      var d = document.createElement('div');
+      d.textContent = line.text === '' ? ' ' : line.text;
+      if (line.cls) d.className = line.cls;
+      el.details.appendChild(d);
+    });
+  }
+  function plain(text) { return { text: text }; }
+
+  function render() {
+    var s = sale;
+    el.warning.textContent = '';
+    el.controls.hidden = true;
+    if (!s) {
+      if (notice) {
+        setBanner(notice.toUpperCase(), 'bad');
+        setDetails([plain('Check the number and try again.')]);
+      } else {
+        setBanner('READY TO SCAN', 'idle');
+        setDetails([plain('Scan the barcode on the ticket,'), plain('or type the ID and tap Look up.')]);
+      }
+      return;
+    }
+
+    var lines = [
+      plain('Ticket #' + s.idText),
+      { text: s.title, cls: 'movie' },
+      plain(s.day + '  ·  ' + s.time + '  ·  ' + s.theater),
+      plain('')
+    ];
+    s.items.forEach(function (i) { lines.push(plain(i.qty + ' × ' + i.type)); });
+    lines.push(plain(''));
+    lines.push(plain('Checked in: ' + s.checkedIn + ' of ' + s.ticketCount + (s.checkedInAt ? '   (last at ' + s.checkedInAt + ')' : '')));
+    setDetails(lines);
+
+    if (s.status === 'refunded') { setBanner('REFUNDED — NOT VALID', 'bad'); return; }
+
+    if (!s.isToday) el.warning.textContent = '⚠ This ticket is for ' + s.day + ', not today.';
+    else if (s.ended) el.warning.textContent = '⚠ This showing has already ended.';
+
+    var left = s.notCheckedIn;
+    if (justAdmitted) {
+      setBanner('✔ CHECKED IN  ·  ' + justAdmitted + (justAdmitted === 1 ? ' person' : ' people'), 'good');
+    } else if (left === 0) {
+      setBanner('ALREADY CHECKED IN', 'bad');
+    } else if (s.checkedIn) {
+      setBanner('PARTLY CHECKED IN  ·  ' + left + ' still to come', 'warn');
+    } else {
+      setBanner('VALID  ·  ' + s.ticketCount + (s.ticketCount === 1 ? ' ticket' : ' tickets'), 'good');
+    }
+
+    el.stepper.hidden = el.go.hidden = left === 0;
+    el.undo.hidden = s.checkedIn === 0;
+    if (left) {
+      admit = Math.min(Math.max(admit, 1), left);
+      el.admit.textContent = admit;
+      el.go.textContent = admit === left ? 'Check in all ' + left : 'Check in ' + admit + ' of ' + left;
+    }
+    el.controls.hidden = !(left || s.checkedIn);
+  }
+
+  function step(delta) {
+    if (!sale) return;
+    admit = Math.min(Math.max(admit + delta, 1), sale.notCheckedIn);
+    render();
+  }
+
+  // ---- check-in counts ----
+  function pad2(n) { return String(n).padStart(2, '0'); }
+
+  function setTab(name) {
+    tab = name;
+    $('scan-view').hidden = name !== 'scan';
+    $('counts-view').hidden = name !== 'counts';
+    $('tab-scan').className = name === 'scan' ? 'on' : '';
+    $('tab-counts').className = name === 'counts' ? 'on' : '';
+    if (name === 'counts') loadCounts();
+  }
+
+  function loadCounts() {
+    var mine = ++countsSeq;
+    api('GET', '/api/checkins' + (countsDay ? '?day=' + countsDay : '')).then(function (res) {
+      if (mine !== countsSeq) return;
+      if (res.status === 200) { counts = res.json; renderCounts(''); }
+      else renderCounts(failText(res));
+    });
+  }
+
+  function shiftDay(delta) {
+    if (!counts) return;
+    var p = counts.day.split('-');
+    var d = new Date(+p[0], +p[1] - 1, +p[2] + delta);
+    countsDay = d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    loadCounts();
+  }
+
+  function renderCounts(error) {
+    var c = counts;
+    var msg = $('counts-msg'), list = $('shows'), total = $('total');
+    list.textContent = '';
+    total.textContent = '';
+    msg.hidden = true;
+    if (c) {
+      $('day').textContent = c.dayLabel;
+      $('day-today').hidden = c.isToday;
+      total.textContent = c.sold ? c.checkedIn + ' of ' + c.sold + ' checked in' : 'No tickets sold';
+      c.shows.forEach(function (s) {
+        var row = document.createElement('div'); row.className = 'show';
+        var left = document.createElement('div');
+        var t = document.createElement('div'); t.className = 't'; t.textContent = s.title;
+        var sub = document.createElement('div'); sub.className = 'sub'; sub.textContent = s.time + '  ·  ' + s.theater;
+        left.appendChild(t); left.appendChild(sub);
+        var n = document.createElement('div');
+        n.className = 'n' + (s.sold > 0 && s.checkedIn >= s.sold ? ' done' : '');
+        n.textContent = s.checkedIn + ' of ' + s.sold;
+        row.appendChild(left); row.appendChild(n);
+        list.appendChild(row);
+      });
+      if (!c.shows.length) { msg.textContent = 'No tickets sold for this day.'; msg.hidden = false; }
+    }
+    if (error) { msg.textContent = error; msg.hidden = false; }
+  }
+
+  // ---- wiring ----
+  $('tab-scan').addEventListener('click', function () { setTab('scan'); });
+  $('tab-counts').addEventListener('click', function () { setTab('counts'); });
+  $('day-prev').addEventListener('click', function () { shiftDay(-1); });
+  $('day-next').addEventListener('click', function () { shiftDay(1); });
+  $('day-today').addEventListener('click', function () { countsDay = null; loadCounts(); });
+  $('counts-refresh').addEventListener('click', loadCounts);
+  setInterval(function () { if (tab === 'counts' && !document.hidden && !modalOpen) loadCounts(); }, 10000);
+
+  var pad = $('pad');
+  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].forEach(function (k) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = k;
+    if (k === '') b.disabled = true;
+    else b.addEventListener('click', function () { if (k === '⌫') backspace(); else pushDigit(k); });
+    pad.appendChild(b);
+  });
+  $('lookup').addEventListener('click', lookup);
+  $('minus').addEventListener('click', function () { step(-1); });
+  $('plus').addEventListener('click', function () { step(1); });
+  el.go.addEventListener('click', checkIn);
+  el.undo.addEventListener('click', undo);
+
+  // Keyboard-wedge barcode scanner: types the ID digits, then Enter.
+  document.addEventListener('keydown', function (e) {
+    if (modalOpen || tab !== 'scan' || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Enter') { e.preventDefault(); lookup(); }
+    else if (e.key === 'Backspace') { e.preventDefault(); backspace(); }
+    else if (e.key.length === 1 && e.key >= '0' && e.key <= '9') { e.preventDefault(); pushDigit(e.key); }
+  });
+  // Fallback for keyboards that only produce input events.
+  el.sink.addEventListener('input', function () {
+    if (!modalOpen && tab === 'scan') el.sink.value.replace(/\D/g, '').split('').forEach(pushDigit);
+    el.sink.value = '';
+  });
+  // Keep a (keyboard-less) text field focused so the hardware keyboard has somewhere to type.
+  function focusSink() { try { el.sink.focus({ preventScroll: true }); } catch (e) { el.sink.focus(); } }
+  document.addEventListener('pointerup', function () { if (!modalOpen) setTimeout(focusSink, 0); });
+  window.addEventListener('focus', focusSink);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) focusSink(); });
+
+  function ping() {
+    api('GET', '/api/ping').then(function (res) {
+      if (res.status === 401 && !sale && !notice) { notice = failText(res); render(); }
+    });
+  }
+  setInterval(ping, 15000);
+
+  renderId();
+  render();
+  focusSink();
+  if (!key) { notice = 'No access key. Scan the QR code on the POS.'; render(); } else { ping(); }
+})();
+</script>
+</body>
+</html>
